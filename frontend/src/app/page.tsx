@@ -42,8 +42,8 @@ export default function Home() {
 
   return (
     <AppShell activePath="/app/conversations">
-      <div className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top_right,_rgba(0,112,235,0.08),_transparent_32%),var(--color-background)]">
-        <header className="flex h-[76px] items-center justify-between border-b border-border/40 bg-white/75 px-5 backdrop-blur-xl md:px-8">
+      <div className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top_right,rgba(0,112,235,0.08),transparent_32%),var(--color-background)]">
+        <header className="flex h-19 items-center justify-between border-b border-border/40 bg-white/75 px-5 backdrop-blur-xl md:px-8">
           <div className="flex items-center gap-3 md:hidden">
             <button className="flex size-10 items-center justify-center rounded-xl text-text-secondary hover:bg-surface" aria-label="Open navigation">
               <Menu className="size-5" />
@@ -63,7 +63,7 @@ export default function Home() {
         </header>
 
         <main className="flex min-h-0 flex-1 flex-col gap-5 p-4 md:p-6 lg:flex-row lg:gap-6 lg:p-8">
-          <section className="flex min-h-[280px] w-full flex-col overflow-hidden rounded-2xl border border-border/50 bg-white/80 shadow-[0_12px_40px_rgba(22,41,79,0.06)] lg:w-[340px] lg:shrink-0">
+          <section className="flex min-h-70 w-full flex-col overflow-hidden rounded-2xl border border-border/50 bg-white/80 shadow-[0_12px_40px_rgba(22,41,79,0.06)] lg:w-85 lg:shrink-0">
             <div className="border-b border-border/40 p-5">
               <div className="flex items-center justify-between">
                 <div>
@@ -99,7 +99,7 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="flex min-h-[520px] min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-white/85 shadow-[0_12px_40px_rgba(22,41,79,0.06)]">
+          <section className="flex min-h-130 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-white/85 shadow-[0_12px_40px_rgba(22,41,79,0.06)]">
             <div className="flex items-center justify-between border-b border-border/40 px-5 py-4 md:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 <Avatar user={selectedConversation.participant} size="md" showOnline isOnline={selectedConversation.participant.isOnline} />
