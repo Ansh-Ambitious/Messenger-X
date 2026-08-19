@@ -20,17 +20,23 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() =>
+    typeof window !== 'undefined' && sessionStorage.getItem('messenger-x-auth') === 'true',
+  );
   const [currentUser, setCurrentUser] = useState<User>(CURRENT_USER);
   const [conversations, setConversations] = useState(CONVERSATIONS);
   const [messages, setMessages] = useState(MESSAGES);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
 
-  const login = () => setIsAuthenticated(true);
+  const login = () => {
+    setIsAuthenticated(true);
+    sessionStorage.setItem('messenger-x-auth', 'true');
+  };
 
   const logout = () => {
     setIsAuthenticated(false);
+    sessionStorage.removeItem('messenger-x-auth');
   };
 
   const sendMessage = (conversationId: string, content: string) => {

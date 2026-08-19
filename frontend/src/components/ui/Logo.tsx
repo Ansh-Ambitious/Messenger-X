@@ -19,9 +19,7 @@ export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
 }
 
 export function LogoText({ className = '' }: { className?: string }) {
-  return (
-    <span className={`font-bold tracking-tight text-primary ${className}`}>NexusChat</span>
-  );
+  return <span className={`font-bold tracking-tight text-primary ${className}`}>Messenger X</span>;
 }
 
 export function LogoWithText({ className = '' }: { className?: string }) {

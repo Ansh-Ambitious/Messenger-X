@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { MessageSquare, Settings, Users } from 'lucide-react';
 import { LogoWithText } from '../ui/Logo';
 import { cn } from '../../utils/cn';
+import { BottomNav } from './BottomNav';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -45,7 +46,10 @@ export function AppShell({ children, activePath }: AppShellProps) {
         </nav>
       </aside>
 
-      <div className="flex min-h-dvh flex-1 flex-col pb-20 md:pb-0">{children}</div>
+      <div className="flex min-h-dvh flex-1 flex-col pb-20 md:pb-0">
+        {children}
+        <BottomNav />
+      </div>
     </div>
   );
 }

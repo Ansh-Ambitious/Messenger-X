@@ -27,7 +27,7 @@ export function Input({ label, icon: Icon, rightElement, error, className, id, .
           className={cn(
             'w-full rounded-lg border border-border bg-background px-4 py-3 text-[15px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-primary',
             Icon && 'pl-10',
-            rightElement && 'pr-10',
+            rightElement ? 'pr-10' : false,
             className,
           )}
           {...props}
