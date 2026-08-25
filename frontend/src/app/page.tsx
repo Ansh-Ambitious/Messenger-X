@@ -3,7 +3,7 @@ import {
   Bell,
   CheckCheck,
   Image,
-  Menu,
+  MessageSquare,
   MoreHorizontal,
   Paperclip,
   Search,
@@ -15,7 +15,6 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { Avatar } from '../components/ui/Avatar';
-import { LogoWithText } from '../components/ui/Logo';
 import { CONVERSATIONS } from '../data/mockData';
 import { useApp } from '../context/AppContext';
 
@@ -44,15 +43,14 @@ export default function Home() {
     <AppShell activePath="/app/conversations">
       <div className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top_right,rgba(0,112,235,0.08),transparent_32%),var(--color-background)]">
         <header className="flex h-19 items-center justify-between border-b border-border/40 bg-white/75 px-5 backdrop-blur-xl md:px-8">
-          <div className="flex items-center gap-3 md:hidden">
-            <button className="flex size-10 items-center justify-center rounded-xl text-text-secondary hover:bg-surface" aria-label="Open navigation">
-              <Menu className="size-5" />
-            </button>
-            <LogoWithText className="scale-[0.62] origin-left" />
-          </div>
-          <div className="hidden md:block">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Your workspace</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Good morning, {currentUser.name.split(' ')[0]}</h1>
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <MessageSquare className="size-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Chat App</p>
+              <h1 className="text-xl font-semibold tracking-tight">Messenger X</h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button className="flex size-10 items-center justify-center rounded-xl text-text-secondary hover:bg-surface" aria-label="Notifications">
@@ -67,7 +65,7 @@ export default function Home() {
             <div className="border-b border-border/40 p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold tracking-tight">Messages</h2>
+                  <h2 className="text-xl font-semibold tracking-tight">Users</h2>
                   <p className="mt-1 text-sm text-text-secondary">{conversations.length} conversations</p>
                 </div>
                 <button className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/15" aria-label="Start a new conversation">
@@ -76,7 +74,7 @@ export default function Home() {
               </div>
               <label className="relative mt-5 block">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" />
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search conversations" className="w-full rounded-xl border border-border/60 bg-background py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-primary" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search users" className="w-full rounded-xl border border-border/60 bg-background py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-primary" />
               </label>
             </div>
             <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
