@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:server": "npm --prefix server run dev"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
+  }
+}
