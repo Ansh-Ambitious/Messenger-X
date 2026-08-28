@@ -20,14 +20,37 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const { login } = useApp();
   const navigate = useNavigate();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isRegister = mode === 'register';
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    login();
-    navigate('/app/conversations', { replace: true });
+    setError('');
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/api/auth/${isRegister ? 'register' : 'login'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isRegister ? { name, email, password } : { email, password }),
+      });
+      const data = (await response.json()) as { token?: string; message?: string };
+
+      if (!response.ok || !data.token) {
+        throw new Error(data.message ?? 'Authentication failed');
+      }
+
+      login(data.token);
+      navigate('/app/conversations', { replace: true });
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Authentication failed');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -39,10 +62,11 @@ function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           <p className="mt-2 text-sm text-text-secondary">{isRegister ? 'Start private conversations with Messenger X.' : 'Continue your conversations in Messenger X.'}</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
-          {isRegister && <label className="flex w-full flex-col gap-1"><span className="text-base font-medium">Full name</span><input className="w-full rounded-lg border border-border bg-background px-4 py-3 text-[15px] outline-none focus:border-primary" placeholder="Alex Rivers" required /></label>}
+          {isRegister && <label className="flex w-full flex-col gap-1"><span className="text-base font-medium">Full name</span><input value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-lg border border-border bg-background px-4 py-3 text-[15px] outline-none focus:border-primary" placeholder="Alex Rivers" required /></label>}
           <InputField label="Email" icon={<Mail className="size-4" />} value={email} onChange={setEmail} type="email" placeholder="you@example.com" />
           <InputField label="Password" value={password} onChange={setPassword} type="password" placeholder="Enter your password" />
-          <Button type="submit" fullWidth size="lg">{isRegister ? <UserPlus className="size-4" /> : <LogIn className="size-4" />}{isRegister ? 'Create account' : 'Sign in'}</Button>
+          {error && <p role="alert" className="text-sm text-error">{error}</p>}
+          <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>{isRegister ? <UserPlus className="size-4" /> : <LogIn className="size-4" />}{isSubmitting ? 'Connecting...' : isRegister ? 'Create account' : 'Sign in'}</Button>
         </form>
         <p className="mt-6 text-center text-sm text-text-secondary">{isRegister ? 'Already have an account?' : 'New to Messenger X?'} <button type="button" onClick={() => navigate(isRegister ? '/login' : '/register')} className="font-semibold text-primary hover:underline">{isRegister ? 'Sign in' : 'Create an account'}</button></p>
       </AuthCard>
