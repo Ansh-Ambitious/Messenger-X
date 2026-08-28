@@ -43,11 +43,14 @@ export default function Home() {
   }
 
   function handleDraftChange(value: string) {
+    const wasTyping = draft.trim().length > 0;
     setDraft(value);
-    setTyping(selectedConversation.id, value.trim().length > 0);
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
     if (value.trim()) {
+      if (!wasTyping) setTyping(selectedConversation.id, true);
       typingTimeout.current = setTimeout(() => setTyping(selectedConversation.id, false), 800);
+    } else if (wasTyping) {
+      setTyping(selectedConversation.id, false);
     }
   }
 
