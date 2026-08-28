@@ -53,6 +53,6 @@ const messageSchema = new Schema<IMessage>(
   { timestamps: false },
 );
 
-messageSchema.index({ conversationId: 1, createdAt: 1 });
+messageSchema.index({ conversationId: 1, createdAt: 1, _id: 1 });
 
 export const Message = model<IMessage>("Message", messageSchema);

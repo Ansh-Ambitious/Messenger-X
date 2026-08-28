@@ -92,8 +92,12 @@ chatRouter.get("/chats/:conversationId/messages", authMiddleware, async (request
     return;
   }
 
-  if (before !== undefined && (typeof before !== "string" || Number.isNaN(Date.parse(before)))) {
-    response.status(400).json({ message: "before must be a valid ISO date" });
+  const [beforeDate, beforeId] = typeof before === "string" ? before.split("|") : [];
+  if (
+    before !== undefined &&
+    (typeof before !== "string" || Number.isNaN(Date.parse(beforeDate)) || !beforeId || !Types.ObjectId.isValid(beforeId))
+  ) {
+    response.status(400).json({ message: "before must contain a valid ISO date and message ID" });
     return;
   }
 
@@ -110,14 +114,23 @@ chatRouter.get("/chats/:conversationId/messages", authMiddleware, async (request
 
     const messageQuery = {
       conversationId,
-      ...(before ? { createdAt: { $lt: new Date(before as string) } } : {}),
+      ...(before
+        ? {
+            $or: [
+              { createdAt: { $lt: new Date(beforeDate) } },
+              { createdAt: new Date(beforeDate), _id: { $lt: new Types.ObjectId(beforeId) } },
+            ],
+          }
+        : {}),
     };
     const page = await Message.find(messageQuery)
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: -1, _id: -1 })
       .limit(limit + 1);
     const hasMore = page.length > limit;
     const messages = page.slice(0, limit).reverse();
-    const nextCursor = hasMore && messages.length > 0 ? messages[0].createdAt.toISOString() : null;
+    const nextCursor = hasMore && messages.length > 0
+      ? `${messages[0].createdAt.toISOString()}|${messages[0]._id.toString()}`
+      : null;
 
     response.json({ messages, hasMore, nextCursor });
   } catch (error) {
