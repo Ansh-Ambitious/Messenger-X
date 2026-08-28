@@ -55,9 +55,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     socket.on('connect_error', () => setSocketStatus('error'));
     socket.on('user_online', ({ userId }: { userId: string }) => {
       setOnlineUsers((previous) => previous.includes(userId) ? previous : [...previous, userId]);
+      setCurrentUser((previous) => previous.id === userId ? { ...previous, isOnline: true } : previous);
+      setConversations((previous) => previous.map((conversation) => conversation.participant.id === userId
+        ? { ...conversation, participant: { ...conversation.participant, isOnline: true } }
+        : conversation));
     });
     socket.on('user_offline', ({ userId }: { userId: string }) => {
       setOnlineUsers((previous) => previous.filter((id) => id !== userId));
+      setCurrentUser((previous) => previous.id === userId ? { ...previous, isOnline: false } : previous);
+      setConversations((previous) => previous.map((conversation) => conversation.participant.id === userId
+        ? { ...conversation, participant: { ...conversation.participant, isOnline: false } }
+        : conversation));
     });
     socket.on('typing', ({ userId }: { userId: string }) => {
       setTypingUsers((previous) => previous.includes(userId) ? previous : [...previous, userId]);

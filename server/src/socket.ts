@@ -67,6 +67,9 @@ export const attachSocketServer = (httpServer: HttpServer): Server => {
     userSockets.set(userId, sockets);
     socket.join(`user:${userId}`);
 
+    void User.findByIdAndUpdate(userId, { isOnline: true }).catch((error) => {
+      console.error("Unable to update online presence:", error);
+    });
     socket.emit("session:identified", { userId });
     io.emit("user_online", { userId });
 
@@ -216,6 +219,9 @@ export const attachSocketServer = (httpServer: HttpServer): Server => {
       currentSockets?.delete(socket.id);
       if (currentSockets?.size === 0) {
         userSockets.delete(userId);
+        void User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() }).catch((error) => {
+          console.error("Unable to update offline presence:", error);
+        });
         io.emit("user_offline", { userId });
       }
     });
