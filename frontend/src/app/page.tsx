@@ -19,12 +19,16 @@ import { CONVERSATIONS } from '../data/mockData';
 import { useApp } from '../context/AppContext';
 
 export default function Home() {
-  const { currentUser, conversations, messages, sendMessage, setTyping, typingUsers, markMessageRead } = useApp();
+  const { currentUser, conversations, messages, sendMessage, loadMessages, setTyping, typingUsers, markMessageRead } = useApp();
   const navigate = useNavigate();
   const { conversationId } = useParams();
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState('');
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [messageCursor, setMessageCursor] = useState<string | null>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messagesPanel = useRef<HTMLDivElement | null>(null);
 
   const visibleConversations = useMemo(
     () => conversations.filter(({ participant }) => participant.name.toLowerCase().includes(search.toLowerCase())),
@@ -33,6 +37,42 @@ export default function Home() {
   const selectedConversation =
     conversations.find(({ id }) => id === conversationId) ?? conversations[0] ?? CONVERSATIONS[0];
   const selectedMessages = messages[selectedConversation.id] ?? [];
+
+  useEffect(() => {
+    if (!/^[a-f\d]{24}$/i.test(selectedConversation.id)) return;
+    setHasMoreMessages(false);
+    setMessageCursor(null);
+    setIsLoadingMessages(true);
+    loadMessages(selectedConversation.id)
+      .then(({ hasMore, nextCursor }) => {
+        setHasMoreMessages(hasMore);
+        setMessageCursor(nextCursor);
+      })
+      .catch((error) => console.error(error))
+      .finally(() => setIsLoadingMessages(false));
+  }, [selectedConversation.id]);
+
+  async function handleMessagesScroll() {
+    const panel = messagesPanel.current;
+    if (!panel || panel.scrollTop > 80 || !hasMoreMessages || !messageCursor || isLoadingMessages) return;
+
+    const previousHeight = panel.scrollHeight;
+    setIsLoadingMessages(true);
+    try {
+      const result = await loadMessages(selectedConversation.id, messageCursor);
+      setHasMoreMessages(result.hasMore);
+      setMessageCursor(result.nextCursor);
+      requestAnimationFrame(() => {
+        if (messagesPanel.current) {
+          messagesPanel.current.scrollTop += messagesPanel.current.scrollHeight - previousHeight;
+        }
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }
 
   useEffect(() => {
     selectedMessages.forEach((message) => {
@@ -134,7 +174,8 @@ export default function Home() {
                 <button className="flex size-9 items-center justify-center rounded-xl hover:bg-surface" aria-label="More conversation options"><MoreHorizontal className="size-5" /></button>
               </div>
             </div>
-            <div className="flex-1 space-y-5 overflow-y-auto bg-[linear-gradient(180deg,rgba(248,249,254,0.4),rgba(255,255,255,0.7))] px-4 py-6 md:px-8">
+            <div ref={messagesPanel} onScroll={handleMessagesScroll} className="flex-1 space-y-5 overflow-y-auto bg-[linear-gradient(180deg,rgba(248,249,254,0.4),rgba(255,255,255,0.7))] px-4 py-6 md:px-8">
+              {isLoadingMessages && hasMoreMessages && <p className="text-center text-xs text-text-muted">Loading older messages...</p>}
               <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-[11px] font-medium text-primary"><span className="size-1.5 rounded-full bg-primary" />Today</div>
               {selectedMessages.map((message) => {
                 const isMine = message.senderId === currentUser.id;

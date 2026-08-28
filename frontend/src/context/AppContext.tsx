@@ -15,6 +15,7 @@ interface AppContextValue {
   login: (token?: string) => void;
   logout: () => void;
   sendMessage: (conversationId: string, content: string) => void;
+  loadMessages: (conversationId: string, before?: string) => Promise<{ hasMore: boolean; nextCursor: string | null }>;
   setTyping: (conversationId: string, isTyping: boolean) => void;
   markMessageRead: (messageId: string) => void;
   updateUser: (updates: Partial<User>) => void;
@@ -166,6 +167,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const loadMessages = async (conversationId: string, before?: string) => {
+    const token = sessionStorage.getItem('messenger-x-token');
+    if (!token) return { hasMore: false, nextCursor: null };
+
+    const query = new URLSearchParams({ limit: '30' });
+    if (before) query.set('before', before);
+    const response = await fetch(`http://127.0.0.1:5000/api/chats/${conversationId}/messages?${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Unable to load messages');
+
+    const data = (await response.json()) as {
+      messages: Array<{ _id: string; conversationId: string; senderId: string; content: string; status: Message['status']; createdAt: string }>;
+      hasMore: boolean;
+      nextCursor: string | null;
+    };
+    const loadedMessages: Message[] = data.messages.map((message) => ({
+      id: message._id,
+      conversationId: message.conversationId,
+      senderId: message.senderId,
+      content: message.content,
+      timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      type: 'text',
+      status: message.status,
+    }));
+
+    setMessages((previous) => {
+      const existing = before ? (previous[conversationId] ?? []) : [];
+      const combined = before ? [...loadedMessages, ...existing] : loadedMessages;
+      const unique = combined.filter((message, index, all) => all.findIndex((item) => item.id === message.id) === index);
+      return { ...previous, [conversationId]: unique };
+    });
+    return { hasMore: data.hasMore, nextCursor: data.nextCursor };
+  };
+
   const updateUser = (updates: Partial<User>) => {
     setCurrentUser((prev) => ({ ...prev, ...updates }));
   };
@@ -182,6 +218,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       sendMessage,
+      loadMessages,
       setTyping,
       markMessageRead,
       updateUser,
