@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Socket } from 'socket.io-client';
 import { CONVERSATIONS, CURRENT_USER, MESSAGES } from '../data/mockData';
 import type { Conversation, Message, User } from '../types';
@@ -32,6 +32,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [socketStatus, setSocketStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [pushNotifications, setPushNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     const token = sessionStorage.getItem('messenger-x-token');
@@ -41,16 +42,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const socket: Socket = createSocket(token);
+    socketRef.current = socket;
     setSocketStatus('connecting');
     socket.on('connect', () => setSocketStatus('connected'));
     socket.on('disconnect', () => setSocketStatus('disconnected'));
     socket.on('connect_error', () => setSocketStatus('error'));
     socket.on('session:identified', ({ userId }: { userId: string }) => {
+      setCurrentUser((previous) => ({ ...previous, id: userId }));
       console.info(`Real-time session established for ${userId}`);
+    });
+    socket.on('receive_message', (message: { id: string; conversationId: string; senderId: string; content: string; status: Message['status']; createdAt: string }) => {
+      const receivedMessage: Message = {
+        id: message.id,
+        conversationId: message.conversationId,
+        senderId: message.senderId,
+        content: message.content,
+        timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+        type: 'text',
+        status: message.status,
+      };
+
+      setMessages((previous) => {
+        const existing = previous[message.conversationId] ?? [];
+        if (existing.some((item) => item.id === receivedMessage.id)) return previous;
+        return { ...previous, [message.conversationId]: [...existing, receivedMessage] };
+      });
+      setConversations((previous) =>
+        previous.map((conversation) =>
+          conversation.id === message.conversationId
+            ? { ...conversation, lastMessage: message.content, lastMessageTime: receivedMessage.timestamp }
+            : conversation,
+        ),
+      );
     });
 
     return () => {
       socket.disconnect();
+      socketRef.current = null;
     };
   }, [isAuthenticated]);
 
@@ -69,34 +97,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const sendMessage = (conversationId: string, content: string) => {
-    if (!content.trim()) return;
+    const trimmedContent = content.trim();
+    if (!trimmedContent || !socketRef.current?.connected) return;
 
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      conversationId,
-      senderId: currentUser.id,
-      content: content.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-      type: 'text',
-      status: 'sent',
-    };
-
-    setMessages((prev) => ({
-      ...prev,
-      [conversationId]: [...(prev[conversationId] ?? []), newMessage],
-    }));
-
-    setConversations((prev) =>
-      prev.map((conv) =>
-        conv.id === conversationId
-          ? {
-              ...conv,
-              lastMessage: content.trim(),
-              lastMessageTime: newMessage.timestamp,
-              unreadCount: 0,
-            }
-          : conv,
-      ),
+    socketRef.current.emit(
+      'send_message',
+      { conversationId, content: trimmedContent },
+      (result: { ok: boolean; error?: string }) => {
+        if (!result.ok) console.error(result.error ?? 'Unable to send message');
+      },
     );
   };
 
