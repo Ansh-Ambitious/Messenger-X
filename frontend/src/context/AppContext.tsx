@@ -141,6 +141,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const markMessageRead = (messageId: string) => {
     if (!socketRef.current?.connected) return;
     socketRef.current.emit('message_read', { messageId });
+    setMessages((previous) => Object.fromEntries(Object.entries(previous).map(([conversationId, items]) => [
+      conversationId,
+      items.map((item) => item.id === messageId ? { ...item, status: 'read' as const } : item),
+    ])));
   };
 
   const logout = () => {

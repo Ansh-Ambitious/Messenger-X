@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
   CheckCheck,
@@ -19,7 +19,7 @@ import { CONVERSATIONS } from '../data/mockData';
 import { useApp } from '../context/AppContext';
 
 export default function Home() {
-  const { currentUser, conversations, messages, sendMessage, setTyping, typingUsers } = useApp();
+  const { currentUser, conversations, messages, sendMessage, setTyping, typingUsers, markMessageRead } = useApp();
   const navigate = useNavigate();
   const { conversationId } = useParams();
   const [search, setSearch] = useState('');
@@ -33,6 +33,14 @@ export default function Home() {
   const selectedConversation =
     conversations.find(({ id }) => id === conversationId) ?? conversations[0] ?? CONVERSATIONS[0];
   const selectedMessages = messages[selectedConversation.id] ?? [];
+
+  useEffect(() => {
+    selectedMessages.forEach((message) => {
+      if (message.senderId !== currentUser.id && message.status !== 'read') {
+        markMessageRead(message.id);
+      }
+    });
+  }, [currentUser.id, markMessageRead, selectedMessages]);
 
   function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
