@@ -19,7 +19,7 @@ import { CONVERSATIONS } from '../data/mockData';
 import { useApp } from '../context/AppContext';
 
 export default function Home() {
-  const { currentUser, conversations, messages, sendMessage, loadMessages, setTyping, typingUsers, markMessageRead } = useApp();
+  const { currentUser, conversations, messages, sendMessage, loadMessages, setTyping, typingUsers, markMessageRead, setSelectedConversation } = useApp();
   const navigate = useNavigate();
   const { conversationId } = useParams();
   const [search, setSearch] = useState('');
@@ -37,6 +37,10 @@ export default function Home() {
   const selectedConversation =
     conversations.find(({ id }) => id === conversationId) ?? conversations[0] ?? CONVERSATIONS[0];
   const selectedMessages = messages[selectedConversation.id] ?? [];
+
+  useEffect(() => {
+    setSelectedConversation(selectedConversation.id);
+  }, [selectedConversation.id, setSelectedConversation]);
 
   useEffect(() => {
     if (!/^[a-f\d]{24}$/i.test(selectedConversation.id)) return;

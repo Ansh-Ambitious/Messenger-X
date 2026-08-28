@@ -7,13 +7,16 @@ import { createSocket } from '../utils/socket';
 interface AppContextValue {
   currentUser: User;
   conversations: Conversation[];
+  selectedConversation: Conversation | null;
   messages: Record<string, Message[]>;
   isAuthenticated: boolean;
   socketStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
+  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
   onlineUsers: string[];
   typingUsers: string[];
   login: (token?: string) => void;
   logout: () => void;
+  setSelectedConversation: (conversationId: string | null) => void;
   sendMessage: (conversationId: string, content: string) => void;
   loadMessages: (conversationId: string, before?: string) => Promise<{ hasMore: boolean; nextCursor: string | null }>;
   setTyping: (conversationId: string, isTyping: boolean) => void;
@@ -33,6 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const [currentUser, setCurrentUser] = useState<User>(CURRENT_USER);
   const [conversations, setConversations] = useState(CONVERSATIONS);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState(MESSAGES);
   const [socketStatus, setSocketStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
@@ -40,6 +44,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pushNotifications, setPushNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const selectedConversation = conversations.find(({ id }) => id === selectedConversationId) ?? null;
 
   useEffect(() => {
     const token = sessionStorage.getItem('messenger-x-token');
@@ -154,6 +159,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('messenger-x-token');
   };
 
+  const setSelectedConversation = (conversationId: string | null) => {
+    setSelectedConversationId(conversationId);
+  };
+
   const sendMessage = (conversationId: string, content: string) => {
     const trimmedContent = content.trim();
     if (!trimmedContent || !socketRef.current?.connected) return;
@@ -210,13 +219,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => ({
       currentUser,
       conversations,
+      selectedConversation,
       messages,
       isAuthenticated,
       socketStatus,
+      connectionStatus: socketStatus,
       onlineUsers,
       typingUsers,
       login,
       logout,
+      setSelectedConversation,
       sendMessage,
       loadMessages,
       setTyping,
@@ -227,7 +239,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       darkMode,
       setDarkMode,
     }),
-    [currentUser, conversations, messages, isAuthenticated, socketStatus, onlineUsers, typingUsers, pushNotifications, darkMode],
+    [currentUser, conversations, selectedConversation, messages, isAuthenticated, socketStatus, onlineUsers, typingUsers, pushNotifications, darkMode],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
