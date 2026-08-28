@@ -10,9 +10,13 @@ interface AppContextValue {
   messages: Record<string, Message[]>;
   isAuthenticated: boolean;
   socketStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
+  onlineUsers: string[];
+  typingUsers: string[];
   login: (token?: string) => void;
   logout: () => void;
   sendMessage: (conversationId: string, content: string) => void;
+  setTyping: (conversationId: string, isTyping: boolean) => void;
+  markMessageRead: (messageId: string) => void;
   updateUser: (updates: Partial<User>) => void;
   pushNotifications: boolean;
   setPushNotifications: (value: boolean) => void;
@@ -30,6 +34,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState(CONVERSATIONS);
   const [messages, setMessages] = useState(MESSAGES);
   const [socketStatus, setSocketStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const socketRef = useRef<Socket | null>(null);
@@ -47,6 +53,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     socket.on('connect', () => setSocketStatus('connected'));
     socket.on('disconnect', () => setSocketStatus('disconnected'));
     socket.on('connect_error', () => setSocketStatus('error'));
+    socket.on('user_online', ({ userId }: { userId: string }) => {
+      setOnlineUsers((previous) => previous.includes(userId) ? previous : [...previous, userId]);
+    });
+    socket.on('user_offline', ({ userId }: { userId: string }) => {
+      setOnlineUsers((previous) => previous.filter((id) => id !== userId));
+    });
+    socket.on('typing', ({ userId }: { userId: string }) => {
+      setTypingUsers((previous) => previous.includes(userId) ? previous : [...previous, userId]);
+    });
+    socket.on('stop_typing', ({ userId }: { userId: string }) => {
+      setTypingUsers((previous) => previous.filter((id) => id !== userId));
+    });
     socket.on('session:identified', ({ userId }: { userId: string }) => {
       setCurrentUser((previous) => ({ ...previous, id: userId }));
       console.info(`Real-time session established for ${userId}`);
@@ -74,11 +92,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
             : conversation,
         ),
       );
+      if (message.senderId !== currentUser.id) {
+        socket.emit('message_delivered', { messageId: message.id });
+      }
+    });
+    socket.on('message_delivered', ({ messageId }: { messageId: string }) => {
+      setMessages((previous) => Object.fromEntries(Object.entries(previous).map(([conversationId, items]) => [
+        conversationId,
+        items.map((item) => item.id === messageId ? { ...item, status: 'delivered' as const } : item),
+      ])));
+    });
+    socket.on('message_read', ({ messageId }: { messageId: string }) => {
+      setMessages((previous) => Object.fromEntries(Object.entries(previous).map(([conversationId, items]) => [
+        conversationId,
+        items.map((item) => item.id === messageId ? { ...item, status: 'read' as const } : item),
+      ])));
     });
 
     return () => {
       socket.disconnect();
       socketRef.current = null;
+      setOnlineUsers([]);
+      setTypingUsers([]);
     };
   }, [isAuthenticated]);
 
@@ -88,6 +123,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     sessionStorage.setItem('messenger-x-auth', 'true');
     setIsAuthenticated(true);
+  };
+
+  const setTyping = (conversationId: string, isTyping: boolean) => {
+    if (!socketRef.current?.connected) return;
+    socketRef.current.emit(isTyping ? 'typing' : 'stop_typing', { conversationId });
+  };
+
+  const markMessageRead = (messageId: string) => {
+    if (!socketRef.current?.connected) return;
+    socketRef.current.emit('message_read', { messageId });
   };
 
   const logout = () => {
@@ -120,16 +165,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       messages,
       isAuthenticated,
       socketStatus,
+      onlineUsers,
+      typingUsers,
       login,
       logout,
       sendMessage,
+      setTyping,
+      markMessageRead,
       updateUser,
       pushNotifications,
       setPushNotifications,
       darkMode,
       setDarkMode,
     }),
-    [currentUser, conversations, messages, isAuthenticated, socketStatus, pushNotifications, darkMode],
+    [currentUser, conversations, messages, isAuthenticated, socketStatus, onlineUsers, typingUsers, pushNotifications, darkMode],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

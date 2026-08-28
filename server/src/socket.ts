@@ -68,6 +68,7 @@ export const attachSocketServer = (httpServer: HttpServer): Server => {
     socket.join(`user:${userId}`);
 
     socket.emit("session:identified", { userId });
+    io.emit("user_online", { userId });
 
     socket.on(
       "send_message",
@@ -129,11 +130,93 @@ export const attachSocketServer = (httpServer: HttpServer): Server => {
       },
     );
 
+    const findConversationRecipient = async (conversationId: unknown) => {
+      if (typeof conversationId !== "string" || !Types.ObjectId.isValid(conversationId)) return null;
+      const conversation = await Conversation.findOne({ _id: conversationId, participants: userId });
+      if (!conversation) return null;
+      const recipient = conversation.participants.find((participant) => participant.toString() !== userId);
+      return recipient ? { conversation, recipientId: recipient.toString() } : null;
+    };
+
+    socket.on("typing", async (payload: { conversationId?: unknown }) => {
+      const result = await findConversationRecipient(payload?.conversationId);
+      if (result) {
+        io.to(`user:${result.recipientId}`).emit("typing", {
+          conversationId: result.conversation._id.toString(),
+          userId,
+        });
+      }
+    });
+
+    socket.on("stop_typing", async (payload: { conversationId?: unknown }) => {
+      const result = await findConversationRecipient(payload?.conversationId);
+      if (result) {
+        io.to(`user:${result.recipientId}`).emit("stop_typing", {
+          conversationId: result.conversation._id.toString(),
+          userId,
+        });
+      }
+    });
+
+    socket.on(
+      "message_delivered",
+      async (payload: { messageId?: unknown }, acknowledge?: (result: { ok: boolean; error?: string }) => void) => {
+        if (typeof payload?.messageId !== "string" || !Types.ObjectId.isValid(payload.messageId)) {
+          acknowledge?.({ ok: false, error: "A valid messageId is required" });
+          return;
+        }
+
+        const message = await Message.findOneAndUpdate(
+          { _id: payload.messageId, receiverId: userId, status: "sent" },
+          { status: "delivered" },
+          { new: true },
+        );
+        if (!message) {
+          acknowledge?.({ ok: false, error: "Message not found" });
+          return;
+        }
+
+        io.to(`user:${message.senderId.toString()}`).emit("message_delivered", {
+          messageId: message._id.toString(),
+          conversationId: message.conversationId.toString(),
+        });
+        acknowledge?.({ ok: true });
+      },
+    );
+
+    socket.on(
+      "message_read",
+      async (payload: { messageId?: unknown }, acknowledge?: (result: { ok: boolean; error?: string }) => void) => {
+        if (typeof payload?.messageId !== "string" || !Types.ObjectId.isValid(payload.messageId)) {
+          acknowledge?.({ ok: false, error: "A valid messageId is required" });
+          return;
+        }
+
+        const message = await Message.findOneAndUpdate(
+          { _id: payload.messageId, receiverId: userId },
+          { status: "read", readAt: new Date() },
+          { new: true },
+        );
+        if (!message) {
+          acknowledge?.({ ok: false, error: "Message not found" });
+          return;
+        }
+
+        io.to(`user:${message.senderId.toString()}`).emit("message_read", {
+          messageId: message._id.toString(),
+          conversationId: message.conversationId.toString(),
+          readAt: message.readAt?.toISOString(),
+        });
+        acknowledge?.({ ok: true });
+      },
+    );
+
     socket.on("disconnect", () => {
       const currentSockets = userSockets.get(userId);
       currentSockets?.delete(socket.id);
       if (currentSockets?.size === 0) {
         userSockets.delete(userId);
+        io.emit("user_offline", { userId });
       }
     });
   });

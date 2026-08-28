@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Bell,
   CheckCheck,
@@ -19,11 +19,12 @@ import { CONVERSATIONS } from '../data/mockData';
 import { useApp } from '../context/AppContext';
 
 export default function Home() {
-  const { currentUser, conversations, messages, sendMessage } = useApp();
+  const { currentUser, conversations, messages, sendMessage, setTyping, typingUsers } = useApp();
   const navigate = useNavigate();
   const { conversationId } = useParams();
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState('');
+  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const visibleConversations = useMemo(
     () => conversations.filter(({ participant }) => participant.name.toLowerCase().includes(search.toLowerCase())),
@@ -36,7 +37,18 @@ export default function Home() {
   function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     sendMessage(selectedConversation.id, draft);
+    setTyping(selectedConversation.id, false);
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
     setDraft('');
+  }
+
+  function handleDraftChange(value: string) {
+    setDraft(value);
+    setTyping(selectedConversation.id, value.trim().length > 0);
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    if (value.trim()) {
+      typingTimeout.current = setTimeout(() => setTyping(selectedConversation.id, false), 800);
+    }
   }
 
   return (
@@ -126,11 +138,12 @@ export default function Home() {
                 );
               })}
               {selectedMessages.length === 0 && <div className="flex h-full items-center justify-center text-sm text-text-muted">Start a new conversation with {selectedConversation.participant.name}.</div>}
+              {typingUsers.length > 0 && <p className="text-xs text-text-muted">{selectedConversation.participant.name} is typing...</p>}
             </div>
             <form onSubmit={handleSend} className="border-t border-border/40 bg-white p-4 md:p-5">
               <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-background p-2 focus-within:border-primary">
                 <button type="button" className="flex size-9 shrink-0 items-center justify-center rounded-xl text-text-secondary hover:bg-surface" aria-label="Attach a file"><Paperclip className="size-4" /></button>
-                <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a message..." className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-text-muted" />
+                <input value={draft} onChange={(event) => handleDraftChange(event.target.value)} placeholder="Write a message..." className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-text-muted" />
                 <button type="button" className="hidden size-9 shrink-0 items-center justify-center rounded-xl text-text-secondary hover:bg-surface sm:flex" aria-label="Add image"><Image className="size-4" /></button>
                 <button type="button" className="hidden size-9 shrink-0 items-center justify-center rounded-xl text-text-secondary hover:bg-surface sm:flex" aria-label="Add emoji"><Smile className="size-4" /></button>
                 <button type="submit" disabled={!draft.trim()} className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition hover:bg-[#004a9e] disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message"><Send className="size-4" /></button>
