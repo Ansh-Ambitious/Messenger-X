@@ -12,10 +12,12 @@ interface AppContextValue {
   isAuthenticated: boolean;
   socketStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
+  errorMessage: string | null;
   onlineUsers: string[];
   typingUsers: string[];
   login: (token?: string) => void;
   logout: () => void;
+  clearError: () => void;
   setSelectedConversation: (conversationId: string | null) => void;
   sendMessage: (conversationId: string, content: string) => void;
   loadMessages: (conversationId: string, before?: string) => Promise<{ hasMore: boolean; nextCursor: string | null }>;
@@ -39,6 +41,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState(MESSAGES);
   const [socketStatus, setSocketStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -46,19 +49,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
   const selectedConversation = conversations.find(({ id }) => id === selectedConversationId) ?? null;
 
+  const clearError = () => setErrorMessage(null);
+
+  const setUserFacingError = (message: string | null | undefined) => {
+    if (!message) {
+      setErrorMessage(null);
+      return;
+    }
+
+    setErrorMessage(message);
+  };
+
   useEffect(() => {
     const token = sessionStorage.getItem('messenger-x-token');
     if (!isAuthenticated || !token) {
       setSocketStatus('disconnected');
+      setErrorMessage('Session expired');
       return;
     }
 
     const socket: Socket = createSocket(token);
     socketRef.current = socket;
     setSocketStatus('connecting');
-    socket.on('connect', () => setSocketStatus('connected'));
-    socket.on('disconnect', () => setSocketStatus('disconnected'));
-    socket.on('connect_error', () => setSocketStatus('error'));
+    setErrorMessage('Reconnecting...');
+
+    socket.on('connect', () => {
+      setSocketStatus('connected');
+      setErrorMessage(null);
+    });
+    socket.on('disconnect', (reason) => {
+      setSocketStatus('disconnected');
+      if (reason === 'io client disconnect') return;
+      setUserFacingError('Connection lost');
+    });
+    socket.on('connect_error', (error: Error & { message?: string }) => {
+      const message = error?.message ?? 'Connection lost';
+      setSocketStatus('error');
+      if (/invalid|expired|authentication|token/i.test(message)) {
+        setUserFacingError('Session expired');
+        return;
+      }
+      setUserFacingError('Connection lost');
+    });
     socket.on('user_online', ({ userId }: { userId: string }) => {
       setOnlineUsers((previous) => previous.includes(userId) ? previous : [...previous, userId]);
       setCurrentUser((previous) => previous.id === userId ? { ...previous, isOnline: true } : previous);
@@ -136,6 +168,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sessionStorage.setItem('messenger-x-token', token);
     }
     sessionStorage.setItem('messenger-x-auth', 'true');
+    setErrorMessage(null);
     setIsAuthenticated(true);
   };
 
@@ -155,6 +188,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setIsAuthenticated(false);
+    setSocketStatus('disconnected');
+    setErrorMessage('Session expired');
     sessionStorage.removeItem('messenger-x-auth');
     sessionStorage.removeItem('messenger-x-token');
   };
@@ -165,13 +200,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const sendMessage = (conversationId: string, content: string) => {
     const trimmedContent = content.trim();
-    if (!trimmedContent || !socketRef.current?.connected) return;
+    if (!trimmedContent) return;
+
+    if (!socketRef.current?.connected) {
+      setUserFacingError('Connection lost');
+      return;
+    }
 
     socketRef.current.emit(
       'send_message',
       { conversationId, content: trimmedContent },
       (result: { ok: boolean; error?: string }) => {
-        if (!result.ok) console.error(result.error ?? 'Unable to send message');
+        if (!result.ok) {
+          const nextMessage = result.error ?? 'Unable to send message';
+          setUserFacingError(nextMessage === 'Conversation not found' ? 'User not found' : nextMessage);
+          return;
+        }
+
+        setErrorMessage(null);
       },
     );
   };
@@ -185,7 +231,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const response = await fetch(`http://127.0.0.1:5000/api/chats/${conversationId}/messages?${query}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) throw new Error('Unable to load messages');
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({})) as { message?: string };
+      const message = errorBody.message ?? 'Unable to load messages';
+      if (/invalid|expired|authentication/i.test(message)) {
+        setUserFacingError('Session expired');
+        throw new Error('Session expired');
+      }
+      if (/user not found|conversation not found/i.test(message)) {
+        setUserFacingError('User not found');
+        throw new Error('User not found');
+      }
+      setUserFacingError(message);
+      throw new Error(message);
+    }
 
     const data = (await response.json()) as {
       messages: Array<{ _id: string; conversationId: string; senderId: string; content: string; status: Message['status']; createdAt: string }>;
@@ -224,10 +283,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isAuthenticated,
       socketStatus,
       connectionStatus: socketStatus,
+      errorMessage,
       onlineUsers,
       typingUsers,
       login,
       logout,
+      clearError,
       setSelectedConversation,
       sendMessage,
       loadMessages,
@@ -239,7 +300,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       darkMode,
       setDarkMode,
     }),
-    [currentUser, conversations, selectedConversation, messages, isAuthenticated, socketStatus, onlineUsers, typingUsers, pushNotifications, darkMode],
+    [currentUser, conversations, selectedConversation, messages, isAuthenticated, socketStatus, errorMessage, onlineUsers, typingUsers, pushNotifications, darkMode],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

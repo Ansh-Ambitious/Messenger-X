@@ -19,7 +19,20 @@ import { CONVERSATIONS } from '../data/mockData';
 import { useApp } from '../context/AppContext';
 
 export default function Home() {
-  const { currentUser, conversations, messages, sendMessage, loadMessages, setTyping, typingUsers, markMessageRead, setSelectedConversation } = useApp();
+  const {
+    currentUser,
+    conversations,
+    messages,
+    sendMessage,
+    loadMessages,
+    setTyping,
+    typingUsers,
+    markMessageRead,
+    setSelectedConversation,
+    connectionStatus,
+    errorMessage,
+    clearError,
+  } = useApp();
   const navigate = useNavigate();
   const { conversationId } = useParams();
   const [search, setSearch] = useState('');
@@ -37,6 +50,7 @@ export default function Home() {
   const selectedConversation =
     conversations.find(({ id }) => id === conversationId) ?? conversations[0] ?? CONVERSATIONS[0];
   const selectedMessages = messages[selectedConversation.id] ?? [];
+  const bannerMessage = errorMessage ?? (connectionStatus === 'connecting' ? 'Reconnecting...' : connectionStatus === 'disconnected' ? 'Connection lost' : null);
 
   useEffect(() => {
     setSelectedConversation(selectedConversation.id);
@@ -179,6 +193,16 @@ export default function Home() {
               </div>
             </div>
             <div ref={messagesPanel} onScroll={handleMessagesScroll} className="flex-1 space-y-5 overflow-y-auto bg-[linear-gradient(180deg,rgba(248,249,254,0.4),rgba(255,255,255,0.7))] px-4 py-6 md:px-8">
+              {bannerMessage && (
+                <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <span>{bannerMessage}</span>
+                  {errorMessage && (
+                    <button type="button" onClick={clearError} className="text-xs font-semibold text-amber-700 hover:text-amber-900">
+                      Dismiss
+                    </button>
+                  )}
+                </div>
+              )}
               {isLoadingMessages && hasMoreMessages && <p className="text-center text-xs text-text-muted">Loading older messages...</p>}
               <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-[11px] font-medium text-primary"><span className="size-1.5 rounded-full bg-primary" />Today</div>
               {selectedMessages.map((message) => {
