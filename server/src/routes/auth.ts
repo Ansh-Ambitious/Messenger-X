@@ -2,9 +2,9 @@ import { compare } from "bcryptjs";
 import { Router } from "express";
 import jwt = require("jsonwebtoken");
 import { User } from "../models/User";
+import { isStrongPassword, isValidEmail, sanitizeText } from "../utils/security";
 
 const authRouter = Router();
-const isValidEmail = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 authRouter.post("/register", async (request, response) => {
   const body = request.body as { name?: unknown; email?: unknown; password?: unknown };
@@ -14,12 +14,12 @@ authRouter.post("/register", async (request, response) => {
     return;
   }
 
-  const name = body.name.trim();
-  const email = body.email.trim().toLowerCase();
+  const name = sanitizeText(body.name, 80);
+  const email = sanitizeText(body.email, 254).trim().toLowerCase();
   const password = body.password;
 
-  if (!name || !isValidEmail(email) || password.length < 8) {
-    response.status(400).json({ message: "Provide a valid name, email, and password of at least 8 characters" });
+  if (!name || !isValidEmail(email) || !isStrongPassword(password)) {
+    response.status(400).json({ message: "Provide a valid name, email, and password with at least 8 characters, including uppercase, lowercase, and a number" });
     return;
   }
 

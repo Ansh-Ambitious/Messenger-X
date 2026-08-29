@@ -5,6 +5,7 @@ import { Types } from "mongoose";
 import { Conversation } from "./models/Conversation";
 import { Message } from "./models/Message";
 import { User } from "./models/User";
+import { isValidObjectId, sanitizeText } from "./utils/security";
 
 type AuthPayload = jwt.JwtPayload & { userId: string };
 
@@ -82,12 +83,13 @@ export const attachSocketServer = (httpServer: HttpServer): Server => {
         const conversationId = payload?.conversationId;
         const content = typeof payload?.content === "string" ? payload.content.trim() : "";
 
-        if (typeof conversationId !== "string" || !Types.ObjectId.isValid(conversationId)) {
+        if (!isValidObjectId(conversationId)) {
           acknowledge?.({ ok: false, error: "A valid conversationId is required" });
           return;
         }
 
-        if (!content || content.length > 2000) {
+        const sanitizedContent = sanitizeText(content, 2000);
+        if (!sanitizedContent) {
           acknowledge?.({ ok: false, error: "Message content must be between 1 and 2000 characters" });
           return;
         }
@@ -114,11 +116,11 @@ export const attachSocketServer = (httpServer: HttpServer): Server => {
             conversationId: conversation._id,
             senderId: userId,
             receiverId,
-            content,
+            content: sanitizedContent,
             status: receiverIsOnline ? "delivered" : "sent",
           });
 
-          conversation.lastMessage = content;
+          conversation.lastMessage = sanitizedContent;
           conversation.lastMessageAt = message.createdAt;
           await conversation.save();
 

@@ -4,6 +4,7 @@ import { authMiddleware } from "../middleware/authMiddleware";
 import { Conversation } from "../models/Conversation";
 import { Message } from "../models/Message";
 import { User } from "../models/User";
+import { isValidObjectId, sanitizeText } from "../utils/security";
 
 const chatRouter = Router();
 
@@ -31,7 +32,7 @@ chatRouter.post("/chats", authMiddleware, async (request, response) => {
   const currentUser = request.user;
   const body = request.body as { userId?: unknown };
 
-  if (!currentUser || typeof body.userId !== "string" || !Types.ObjectId.isValid(body.userId)) {
+  if (!currentUser || !isValidObjectId(body.userId)) {
     response.status(400).json({ message: "A valid userId is required" });
     return;
   }
@@ -87,7 +88,7 @@ chatRouter.get("/chats/:conversationId/messages", authMiddleware, async (request
     return;
   }
 
-  if (typeof conversationId !== "string" || !Types.ObjectId.isValid(conversationId)) {
+  if (!isValidObjectId(conversationId)) {
     response.status(400).json({ message: "A valid conversationId is required" });
     return;
   }
@@ -95,7 +96,7 @@ chatRouter.get("/chats/:conversationId/messages", authMiddleware, async (request
   const [beforeDate, beforeId] = typeof before === "string" ? before.split("|") : [];
   if (
     before !== undefined &&
-    (typeof before !== "string" || Number.isNaN(Date.parse(beforeDate)) || !beforeId || !Types.ObjectId.isValid(beforeId))
+    (typeof before !== "string" || Number.isNaN(Date.parse(beforeDate)) || !beforeId || !isValidObjectId(beforeId))
   ) {
     response.status(400).json({ message: "before must contain a valid ISO date and message ID" });
     return;
